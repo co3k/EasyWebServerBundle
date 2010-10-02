@@ -26,6 +26,28 @@ class StartCommand extends Command
       ->setHelp('*WIP*');
   }
 
+  protected function processUserRequest()
+  {
+    restore_error_handler();
+
+    $originalKernel = $this->application->getKernel();
+    $kernelClass = get_class($originalKernel);
+    $r = new \ReflectionObject($originalKernel);
+
+    require_once $r->getFileName();
+
+    $requestClass = $originalKernel->getContainer()->getRequestService();
+    $request = $requestClass::create('/statuses');
+    $request->setRequestFormat('html');
+
+    $newKernel = new $kernelClass('prod', true);
+    $result = (string)$newKernel->handle($request);
+
+    $this->container->getErrorHandlerService()->register();
+
+    return $result;
+  }
+
   protected function execute(InputInterface $input, OutputInterface $output)
   {
     $this->socket = socket_create_listen(8080);
@@ -52,13 +74,7 @@ class StartCommand extends Command
         }
         else
         {
-          $content = 'Hello';
-
-          $response = "HTTP/1.0 200 OK\n"
-                    . "Content-Length: ".strlen($content)."\n"
-                    . "Content-Type: text/html\n"
-                    . "\n"
-                    . $content;
+          $response = $this->processUserRequest();
 
           socket_write($client, $response, strlen($response));
 
